@@ -1,0 +1,110 @@
+# This script performs NERS procedure to determinate the Helmholtz free-energy dependence with temperature of mW liquid.
+
+label RESTART
+
+######################################     General Variables     #######################################
+# Initalizes random number generator.
+  variable          rnd      equal   round(random(0,999999,${RANDOM}))
+
+  # Simulation variables.
+  variable          P        equal   0.0          # Simulation pressure (bar).
+  variable          T        equal   290          # Simulation temperature (K).
+  variable          Tf       equal   260          # Target temperature (K).
+
+  # Time variables.
+  variable          t_eq     equal   50000        # Equilibration steps.
+  variable          t_s      equal   400000       # Switching steps.
+  variable          dt       equal   0.002        # Timestep (ps).
+  variable          damp_T   equal   100*${dt}    # Damp parameter for the thermostat (ps).
+  variable          damp_P   equal   1000*${dt}   # Damp parameter for the barostat (ps).
+
+  # Thermodynamic integration variables.
+  variable          li       equal   1.0          # Initial lambda.
+  variable          lf       equal   $T/${Tf}     # Final lambda.
+  variable          N_sim    loop    10           # Number of independent simulations.
+#------------------------------------------------------------------------------------------------------#
+
+
+########################################     Atomic setup     ##########################################
+# Defines the style of atoms, units and boundary conditions.
+  atom_style        atomic
+  units             metal
+  boundary          p p p
+
+# Read atoms positions, velocities and box parameters.
+  read_data         data_init.dat
+
+  neigh_modify      delay 0
+
+  mass              1 18.01528
+
+# Define SW potential parameters.
+  pair_style        sw
+  pair_coeff        * * mW.sw H2O
+
+  timestep          ${dt}
+#------------------------------------------------------------------------------------------------------#
+
+
+################################     Fixes, computes and constraints     ###############################
+# Find center-of-mass coordinates.
+  variable          xcm equal xcm(all,x)
+  variable          ycm equal xcm(all,y)
+  variable          zcm equal xcm(all,z)
+
+# Integrator, barostat & thermostat.
+  fix               f1 all nph iso $P $P ${damp_P} &
+                           fixedpoint ${xcm} ${ycm} ${zcm}
+  fix               f2 all langevin $T $T ${damp_T} ${rnd}
+  variable          rnd equal round(random(0,999999,0))     # Generates new rnd #.
+
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Output setup     ########################################
+# Output variables.
+  variable          step   equal   step
+  variable          dU     equal   c_thermo_pe/atoms              # Driving-force during NERS procedure.
+
+# Thermo output.
+  thermo_style      custom step v_dU
+  thermo            1000
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Run simulation     ######################################
+# Equilibrate the fluid with li = 1.0 and switch to lf = $T/${Tf} (Forward realization).
+  run               ${t_eq}
+
+  print             "${dU} ${li}" file data2/forward_${N_sim}.dat
+  variable          lambda equal ramp(${li},${lf})
+  fix               f3 all adapt 1 pair sw fscale * * v_lambda
+  fix               f4 all print 1 "${dU} ${lambda}" screen no &
+                    append data2/forward_${N_sim}.dat title "# dU lambda"
+
+  run               ${t_s}
+
+  unfix             f3
+  unfix             f4
+
+# Equilibrate the fluid with lf = $T/${Tf} and switch to li = 1.0 (Backward realization).
+  run               ${t_eq}
+
+  print             "${dU} ${lf}" file data2/backward_${N_sim}.dat
+  variable          lambda equal ramp(${lf},${li})
+  fix               f3 all adapt 1 pair sw fscale * * v_lambda
+  fix               f4 all print 1 "${dU} ${lambda}" screen no &
+                    append data2/backward_${N_sim}.dat title "# dU lambda"
+
+  run               ${t_s}
+
+  unfix             f3
+  unfix             f4
+#------------------------------------------------------------------------------------------------------#
+
+ 
+##########################################     Loop procedure     ######################################
+next N_sim
+clear
+jump input_ners.lmp RESTART
+#------------------------------------------------------------------------------------------------------#

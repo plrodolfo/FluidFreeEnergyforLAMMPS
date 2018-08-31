@@ -1,0 +1,153 @@
+# This script performs NEHI procedure to compute the Helmholtz free-energy of TIP4P water model. The reference system is the UF/Rw.
+
+label RESTART
+
+######################################     General Variables     #######################################
+# Initalizes random number generator.
+  variable        rnd        equal   round(random(0,999999,${RANDOM}))
+
+# Simulation variables.
+  variable        T          equal   225               # Simulation temperature (K).   
+  variable        dt         equal   2.0               # Timestep (fs).
+  variable        damp_T     equal   100*${dt}         # Thermostat damp parameter (fs).
+  variable        t_eq       equal   100000            # Equilibration steps.
+  variable        t_s        equal   300000            # Switching steps.
+
+# Potencial parameters.
+  variable        eps_lj     equal   0.155             # LJ epsilon parameter (kcal/mol).
+  variable        sig_lj     equal   3.154             # LJ sigma parameter (Angstrons).
+  variable        rc_lj      equal   8.5               # LJ cutoff radius (Angstrons).
+  variable        acc        equal   1.0e-6            # Kspace accuracy. 
+  variable        r_M        equal   0.15              # Distance from O atom to massless charge (Angstrons).
+
+  variable        kB         equal   0.0019872041      # Boltzmann constant (Kcal/mol.K).
+  variable        p          equal   50.0              # UF p-parameter.
+  variable        eps_uf     equal   $p*${kB}*$T       # UF epsilon parameter (Kcal/mol).
+  variable        sig_uf     equal   2.0               # UF sigma parameter (Angs).
+  variable        rc_uf      equal   5.0*${sig_uf}     # UF cutoff radius (Angs).
+
+  variable        r_eq       equal   0.9572            # Equilibrium bond length (Angs).
+  variable        alpha_eq   equal   104.52            # Equilibrium angle position (Degrees).
+  variable        Kh         equal   100000.0          # Bond/Angle harmonic Spring constant.
+
+# Thermodynamic integration variables.
+  variable        li         equal   1.0               # Initial lambda.
+  variable        lf         equal   0.0               # Final lambda.
+  variable        N_sim      loop    5                 # Number of independent simulations.
+#------------------------------------------------------------------------------------------------------#
+
+
+########################################     Atomic setup     ##########################################
+# Defines the style of atoms, units and boundary conditions.
+  atom_style      full
+  units           real
+  boundary        p p p
+
+# Read atoms positions, velocities and box parameters.
+  read_data       data_tip4p_init.dat
+
+  neighbor        2.0 bin
+  neigh_modify    every 1 delay 5 check yes
+
+  timestep        ${dt}
+
+# Define TIP4P and UF/Rw potentials.
+  pair_style      hybrid/overlay lj/cut/tip4p/long 1 2 1 1 ${r_M} ${rc_lj} ufm/rw 1 2 ${eps_uf} ${sig_uf} ${rc_uf}
+  pair_coeff      1 1 lj/cut/tip4p/long ${eps_lj} ${sig_lj}
+  pair_coeff      1 2 lj/cut/tip4p/long 0.0 0.0
+  pair_coeff      2 2 lj/cut/tip4p/long 0.0 0.0
+  pair_coeff      * * ufm/rw
+
+# Define bond and angle potentials.
+  bond_style      harmonic 
+  bond_coeff      1 ${Kh} ${r_eq}
+
+  angle_style     harmonic
+  angle_coeff     1 ${Kh} ${alpha_eq}
+
+# Define long-range solver.
+  kspace_style    pppm/tip4p ${acc}
+#------------------------------------------------------------------------------------------------------#
+
+
+################################     Fixes, computes and constraints     ###############################
+# Constraints, integrator & thermostat.
+  fix             f1 all shake 1e-6 200 0 b 1 a 1
+  fix             f2 all nve
+  fix             f3 all langevin $T $T ${damp_T} ${rnd} 
+  variable        rnd equal round(random(0,999999,0))                # Generates new rnd #.
+
+# Compute the intermolecular potential energy of each pair style.
+  compute         c1 all pair lj/cut/tip4p/long
+  compute         c2 all pe kspace
+  compute         c3 all pair ufm/rw
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Output setup     ########################################
+# Output variables.
+  variable        step   equal step
+  variable        u_tail equal -0.072994940982049                    # LJ energy tail correction.
+  variable        dU     equal (c_c1+c_c2-c_c3)*3.0/atoms+${u_tail}  # Driving-force during NEHI procedure.
+
+# Thermo output.
+  thermo_style    custom step v_dU
+  thermo          1000
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Run simulation     ######################################
+# Turn UF/Rw potential off (completely) to equilibrate the TIP4P potential.
+  variable        zero equal 0
+  fix             f0 all adapt 0 pair ufm/rw fscale * * v_zero
+  run             0
+  unfix           f0
+
+# Equilibrate the fluid interacting by TIP4P potential and switch to UF/Rw potential (Forward realization).
+  run             ${t_eq}
+
+  print           "${dU} ${li}" file data/forward_${N_sim}.dat
+  variable        lambda_tip4p equal ramp(${li},${lf})
+  fix             f4 all adapt 1 pair lj/cut/tip4p/long fscale * * v_lambda_tip4p &
+                  kspace v_lambda_tip4p fscale yes
+  variable        lambda_ufm equal ramp(${lf},${li})
+  fix             f5 all adapt 1 pair ufm/rw fscale * * v_lambda_ufm
+  fix             f6 all print 1 "${dU} ${lambda_tip4p}" &
+                  title "# dU lambda" screen no       &
+                  append data/forward_${N_sim}.dat
+
+  run             ${t_s}
+
+  unfix           f4
+  unfix           f5
+  unfix           f6
+
+# Turn off long-range force contributions to equilibrate the fluid interacting by UF/Rw potential.
+  kspace_style    pppm/tip4p ${acc} 0.0
+
+# Equilibrate the fluid interacting by UF/Rw potential and switch to TIP4P potential (Backward realization).
+  run             ${t_eq}
+
+  print           "${dU} ${lf}" file data/backward_${N_sim}.dat
+  variable        lambda_tip4p equal ramp(${lf},${li})
+  fix             f4 all adapt 1 pair lj/cut/tip4p/long fscale * * v_lambda_tip4p &
+                  kspace v_lambda_tip4p fscale yes
+  variable        lambda_ufm equal ramp(${li},${lf})
+  fix             f5 all adapt 1 pair ufm/rw fscale * * v_lambda_ufm
+  fix             f6 all print 1 "${dU} ${lambda_tip4p}" &
+                  title "# dU lambda" screen no       &
+                  append data/backward_${N_sim}.dat
+
+  run             ${t_s}
+
+  unfix           f4
+  unfix           f5
+  unfix           f6
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Loop procedure     ######################################
+next N_sim
+clear
+jump input_nehi.lmp RESTART
+#------------------------------------------------------------------------------------------------------#

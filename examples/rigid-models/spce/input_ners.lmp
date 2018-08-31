@@ -1,0 +1,129 @@
+# This script performs NERS procedure to compute the Helmholtz free-energy of SPC/E fluid as a function of temperature.
+
+label RESTART
+
+######################################     General Variables     #######################################
+# Initalizes random number generator.
+  variable        rnd        equal   round(random(0,999999,${RANDOM}))
+
+# Simulation variables.
+  variable        T          equal   225               # Simulation temperature (K).
+  variable        Tf         equal   443               # Target temperature (K).
+  variable        dt         equal   2.0               # Timestep (fs).
+  variable        damp_T     equal   100*${dt}         # Thermostat damp parameter (fs).
+  variable        t_eq       equal   100000            # Equilibration steps.
+  variable        t_s        equal   500000            # Switching steps.
+
+# Potencial parameters.
+  variable        eps_lj     equal   0.1554            # LJ epsilon parameter (kcal/mol).
+  variable        sig_lj     equal   3.1656            # LJ sigma parameter (Angstrons).
+  variable        rc_lj      equal   8.5               # LJ cutoff radius (Angstrons).
+  variable        Kh         equal   100000.0          # Harmonic Spring constant.
+  variable        acc        equal   1.0e-6            # Kspace accuracy. 
+
+  variable        r_eq       equal   1.0               # Equilibrium bond length (Angstrons).
+  variable        alpha_eq   equal   109.47            # Equilibrium angle position (Degrees).
+  variable        Kh         equal   100000.0          # Bond/Angle harmonic Spring constant.
+
+# Thermodynamic integration variables.
+  variable        li         equal   1.0               # Initial lambda.
+  variable        lf         equal   $T/${Tf}          # Final lambda.
+  variable        N_sim      loop    5                 # Number of independent simulations.
+#------------------------------------------------------------------------------------------------------#
+
+
+########################################     Atomic setup     ##########################################
+# Defines the style of atoms, units and boundary conditions.
+  atom_style      full
+  units           real
+  boundary        p p p
+
+# Read atoms positions, velocities and box parameters.
+  read_data       data_spce_init.dat
+
+  neighbor        2.0 bin
+  neigh_modify    every 1 delay 5 check yes
+
+  timestep        ${dt}
+
+# Define SPC/E potential.
+  pair_style      lj/cut/coul/long ${rc_lj}
+  pair_coeff      1 1 ${eps_lj} ${sig_lj}
+  pair_coeff      1 2 0.0 0.0
+  pair_coeff      2 2 0.0 0.0
+
+# Define bond and angle potentials.
+  bond_style      harmonic 
+  bond_coeff      1 ${Kh} ${r_eq}
+
+  angle_style     harmonic
+  angle_coeff     1 ${Kh} ${alpha_eq}
+
+# Define long-range solver.
+  kspace_style    pppm ${acc}
+#------------------------------------------------------------------------------------------------------#
+
+
+################################     Fixes, computes and constraints     ###############################
+# Constraints, Integrator & thermostat.
+  fix             f1 all shake 1e-6 200 0 b 1 a 1
+  fix             f2 all nve
+  fix             f3 all langevin $T $T ${damp_T} ${rnd}
+  variable        rnd equal round(random(0,999999,0))     # Generates new rnd #.
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Output setup     ########################################
+# Output variables.
+  variable        step   equal step
+  variable        u_tail equal -0.072994940982049               # LJ energy tail correction.
+  variable        dU     equal c_thermo_pe*3.0/atoms+${u_tail}  # Driving-force during AS procedure.
+
+# Thermo output.
+  thermo_style    custom step v_dU
+  thermo          1000
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Run simulation     ######################################
+# Equilibrate the fluid with li = 1.0 and switch to lf = $T/${Tf} (Forward realization).
+  run             ${t_eq}
+
+  print           "${dU} ${li}" file data2/forward_${N_sim}.dat
+  variable        lambda equal ramp(${li},${lf})
+  fix             f4 all adapt 1 pair lj/cut/coul/long fscale * * v_lambda &
+                  kspace v_lambda fscale yes
+  fix             f5 all print 1 "${dU} ${lambda}"    &
+                  title "# dU lambda" screen no       &
+                  append data2/forward_${N_sim}.dat
+
+  run             ${t_s}
+
+  unfix           f4
+  unfix           f5
+
+  kspace_style    pppm ${acc} ${lf}
+
+# Equilibrate the fluid with lf = $T/${Tf} and switch to li = 1.0 (Backward realization).
+  run             ${t_eq}
+
+  print           "${dU} ${lf}" file data2/backward_${N_sim}.dat
+  variable        lambda equal ramp(${lf},${li})
+  fix             f4 all adapt 1 pair lj/cut/coul/long fscale * * v_lambda &
+                  kspace v_lambda fscale yes
+  fix             f5 all print 1 "${dU} ${lambda}"    &
+                  title "# dU lambda" screen no       &
+                  append data2/backward_${N_sim}.dat
+
+  run             ${t_s}
+
+  unfix           f4
+  unfix           f5
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Loop procedure     ######################################
+next N_sim
+clear
+jump input_ners.lmp RESTART
+#------------------------------------------------------------------------------------------------------#

@@ -1,0 +1,155 @@
+# This script performs NEHI procedure to compute the classical Helmholtz free-energy of q-SPC/Fw fluid. The reference system is the UF/Fw.
+ 
+
+label RESTART
+
+######################################     General Variables     #######################################
+# Initalizes random number generator.
+  variable        rnd        equal   round(random(0,999999,${RANDOM}))
+
+# Simulation variables.
+  variable        T          equal   255              # Simulation temperature (K).  
+  variable        dt         equal   0.1              # Timestep (fs).
+  variable        damp_T     equal   100*${dt}        # Thermostat damp parameter (fs).
+  variable        t_eq       equal   4000000          # Equilibration steps.
+  variable        t_s        equal   20000000         # Switching steps.
+
+# Potencial parameters.
+  variable        eps_lj     equal   0.1554           # LJ epsilon parameter (kcal/mol).
+  variable        sig_lj     equal   3.1655           # LJ sigma parameter (Angstrons).
+  variable        rc_lj      equal   9.0              # LJ cutoff radius (Angstrons).
+  variable        acc        equal   1.0e-5           # Kspace accuracy.
+
+  variable        kB         equal   0.0019872041     # Boltzmann constant (Kcal/mol.K)
+  variable        p          equal   50.0             # UF p-parameter.
+  variable        eps_uf     equal   $T*$p*${kB}      # UF epsilon parameter.
+  variable        sig_uf     equal   1.8              # UF sigma parameter.
+  variable        rc_uf      equal   5.0*${sig_uf}    # UF cutoff radius.
+
+  variable        r_eq       equal   1.0000           # Equilibrium bond length (Angstrons).
+  variable        K_r        equal   529.581          # Bond harmonic spring constant (kcal/mol.A^2).
+  variable        theta_eq   equal   112.0            # Equilibrium angle position (Degrees). 
+  variable        K_theta    equal   37.95            # Angle harmonic Spring constant (kcal/mol.rad^2).
+
+# Thermodynamic integration variables.
+  variable        li         equal   1.0              # Initial lambda.
+  variable        lf         equal   0.0              # Final lambda.
+  variable        N_sim      loop    5                # Number of independent simulations.
+#------------------------------------------------------------------------------------------------------#
+
+
+########################################     Atomic setup     ##########################################
+# Defines the style of atoms, units and boundary conditions.
+  atom_style      full
+  units           real
+  boundary        p p p
+
+# Read atoms positions, velocities and box parameters.
+  read_data       data_init.dat
+
+  neighbor        2.0 bin
+  neigh_modify    every 1 delay 5 check yes
+
+  timestep        ${dt}
+
+# Define q-SPC/Fw and UF/Fw potentials.
+  pair_style      hybrid/overlay lj/cut/coul/long ${rc_lj} ufm ${rc_uf}
+  pair_coeff      1 1 lj/cut/coul/long ${eps_lj} ${sig_lj}
+  pair_coeff      1 2 lj/cut/coul/long 0.0 0.0
+  pair_coeff      2 2 lj/cut/coul/long 0.0 0.0
+  pair_coeff      1 1 ufm ${eps_uf} ${sig_uf}
+  pair_coeff      1 2 ufm 0.0 0.1
+  pair_coeff      2 2 ufm 0.0 0.1
+
+# Define bond and angle potentials.
+  bond_style      harmonic
+  bond_coeff      1 ${K_r} ${r_eq}
+
+  angle_style     harmonic
+  angle_coeff     1 ${K_theta} ${theta_eq}
+
+# Define long-range solver.
+  kspace_style    pppm ${acc}
+#------------------------------------------------------------------------------------------------------#
+
+
+################################     Fixes, computes and constraints     ###############################
+# Integrator & thermostat.
+  fix             f1 all nve
+  fix             f2 all langevin $T $T ${damp_T} ${rnd}
+  variable        rnd equal round(random(0,999999,0))             # Generates new rnd #.
+
+# Compute the intermolecular potential energy of each pair style.
+  compute         c1 all pair lj/cut/coul/long
+  compute         c2 all pe kspace
+  compute         c3 all pair ufm
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Output setup     ########################################
+# Output variables.
+  variable        dU   equal (c_c1+c_c2-c_c3)*3.0/atoms           # Driving-force during NEHI procedure.
+  variable        step equal step
+  variable        temp equal temp
+
+  thermo          1000 
+  thermo_style    custom step v_dU
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Run simulation     ######################################
+# Turn UF/Fw potential off (completely) to equilibrate the q-SPC/Fw potential.
+  variable        zero equal 0
+  fix             f0 all adapt 0 pair ufm fscale * * v_zero
+  run             0
+  unfix           f0
+
+# Equilibrate the fluid interacting by q-SPC/Fw potential and switch to UF/Fw potential (Forward realization).
+  run             ${t_eq}
+
+  print           "${dU} ${li}" file data/forward_${N_sim}.dat
+  variable        lambda_qspc equal ramp(${li},${lf})
+  fix             f3 all adapt 1 pair lj/cut/coul/long fscale * * v_lambda_qspc &
+                  kspace v_lambda_qspc fscale yes
+  variable        lambda_ufm equal ramp(${lf},${li})
+  fix             f4 all adapt 1 pair ufm fscale * * v_lambda_ufm
+  fix             f5 all print 1 "${dU} ${lambda_qspc}" &
+                  title "# dU lambda" screen no       &
+                  append data/forward_${N_sim}.dat
+
+  run             ${t_s}
+
+  unfix           f3
+  unfix           f4
+  unfix           f5
+
+# Turn off long-range force contributions to equilibrate the fluid interacting by UF/Fw potential.
+  kspace_style    pppm ${acc} 0.0
+
+# Equilibrate the fluid interacting by UF/Fw potential and switch to q-SPC/Fw potential (Backward realization).
+  run             ${t_eq}
+
+  print           "${dU} ${lf}" file data/backward_${N_sim}.dat
+  variable        lambda_qspc equal ramp(${lf},${li})
+  fix             f3 all adapt 1 pair lj/cut/coul/long fscale * * v_lambda_qspc &
+                  kspace v_lambda_qspc fscale yes
+  variable        lambda_ufm equal ramp(${li},${lf})
+  fix             f4 all adapt 1 pair ufm fscale * * v_lambda_ufm
+  fix             f5 all print 1 "${dU} ${lambda_qspc}" &
+                  title "# dU lambda" screen no       &
+                  append data/backward_${N_sim}.dat
+
+  run             ${t_s}
+
+  unfix           f3
+  unfix           f4
+  unfix           f5
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Loop procedure     ######################################
+next N_sim
+clear
+jump input_nehi.lmp RESTART
+#------------------------------------------------------------------------------------------------------#
+

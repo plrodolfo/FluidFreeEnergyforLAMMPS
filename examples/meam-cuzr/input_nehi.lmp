@@ -1,0 +1,120 @@
+# This script performs NEHI procedure to compute the free-energy of liquid Cu-Zr alloy with 2000 atoms (1000 Cu/Zr). The reference system is the UFM.
+
+label RESTART
+
+######################################     General Variables     #######################################
+# Initalizes random number generator.
+  variable        rnd      equal   round(random(0,999999,${RANDOM}))
+
+# Time variables.
+  variable        T        equal   1800              # Simulation temperature (K).
+  variable        p        equal   50.0              # UFM p-parameter - rate between eps and kB*T.
+  variable        kB       equal   8.6173303e-5      # Boltzmann constant (eV/K).
+  variable        eps      equal   $T*$p*${kB}       # UFM-epsilon parameter.
+  variable        sig      equal   1.5               # UFM-sigma parameter.
+  variable        rc       equal   5.0*${sig}        # UFM-cutoff radius.
+
+# Simulation variables.
+  variable        dt       equal   0.001             # Timestep (ps).
+  variable        damp_T   equal   100*${dt}         # Thermostat damp parameter (fs).
+  variable        t_eq     equal   100000            # Equilibration steps.
+  variable        t_s      equal   500000            # Switching steps.
+
+# Adiabatic switching parameters.
+  variable        li       equal   1.0               # Initial lambda.
+  variable        lf       equal   0.0               # Final lambda.
+  variable        N_sim    loop    10                # Number of independent simulations.
+#------------------------------------------------------------------------------------------------------#
+
+
+########################################     Atomic setup     ##########################################
+# Defines the style of atoms, units and boundary conditions.
+  atom_style      atomic
+  units           metal
+  boundary        p p p
+
+# Read atoms positions, velocities and box parameters.
+  read_data       data_init.dat
+
+  neigh_modify    delay 0
+
+# Define MEAM and UF potentials parameters.
+  pair_style      hybrid/overlay meam/c ufm ${rc}
+  pair_coeff      * * meam/c library.meam Cu Zr CuZr.meam Cu Zr
+  pair_coeff      * * ufm ${eps} ${sig}
+
+  timestep        ${dt}
+#------------------------------------------------------------------------------------------------------#
+
+
+################################     Fixes, computes and constraints     ###############################
+# Integrator & thermostat.
+  fix             f1 all nve                              
+  fix             f2 all langevin $T $T ${damp_T} ${rnd} 
+  variable        rnd equal round(random(0,999999,0))     # Generates new rnd #.
+
+# Compute the potential energy of each pair style.
+  compute         c1 all pair meam/c
+  compute         c2 all pair ufm
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Output setup     ########################################
+# Output variables.
+  variable        step equal step
+  variable        dU equal (c_c1-c_c2)/atoms              # Driving-force obtained from NEHI procedure.
+
+# Thermo output.
+  thermo_style    custom step v_dU
+  thermo          1000
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Run simulation     ######################################
+# Turn UF potential off (completely) to equilibrate the MEAM potential.
+  variable        zero equal 0
+  fix             f0 all adapt 0 pair ufm fscale * * v_zero
+  run             0
+  unfix           f0
+
+# Equilibrate the fluid interacting by MEAM potential and switch to UF potential (Forward realization).
+  run             ${t_eq}
+
+  print           "${dU} ${li}" file data/forward_${N_sim}.dat
+  variable        lambda_meam equal ramp(${li},${lf})                 # Linear lambda protocol from 1 to 0.
+  fix             f3 all adapt 1 pair meam/c fscale * * v_lambda_meam
+  variable        lambda_ufm equal ramp(${lf},${li})                  # Linear lambda protocol from 0 to 1.
+  fix             f4 all adapt 1 pair ufm fscale * * v_lambda_ufm
+  fix             f5 all print 1 "${dU} ${lambda_meam}" &
+                  title "# dU lambda" screen no       &
+                  append data/forward_${N_sim}.dat
+  run             ${t_s}
+
+  unfix           f3
+  unfix           f4
+  unfix           f5
+
+# Equilibrate the fluid interacting by UF potential and switch to MEAM potential (Backward realization).
+  run             ${t_eq}
+
+  print           "${dU} ${lf}" file data/backward_${N_sim}.dat
+  variable        lambda_meam equal ramp(${lf},${li})                 # Linear lambda protocol from 0 to 1.
+  fix             f3 all adapt 1 pair meam/c fscale * * v_lambda_meam
+  variable        lambda_ufm equal ramp(${li},${lf})                  # Linear lambda protocol from 1 to 0.
+  fix             f4 all adapt 1 pair ufm fscale * * v_lambda_ufm
+  fix             f5 all print 1 "${dU} ${lambda_meam}" &
+                  title "# dU lambda" screen no       &
+                  append data/backward_${N_sim}.dat
+  run             ${t_s}
+
+  unfix           f3
+  unfix           f4
+  unfix           f5
+#------------------------------------------------------------------------------------------------------#
+
+
+##########################################     Loop procedure     ######################################
+next N_sim
+clear
+jump input_nehi.lmp RESTART
+#------------------------------------------------------------------------------------------------------#
