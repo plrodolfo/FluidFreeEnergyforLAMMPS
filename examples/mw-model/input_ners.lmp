@@ -78,7 +78,7 @@ label RESTART
 
   print             "${dU} ${li}" file data2/forward_${N_sim}.dat
   variable          lambda equal ramp(${li},${lf})
-  fix               f3 all adapt 1 pair sw fscale * * v_lambda
+  fix               f3 all adapt 1 pair sw fscale 1 1 v_lambda
   fix               f4 all print 1 "${dU} ${lambda}" screen no &
                     append data2/forward_${N_sim}.dat title "# dU lambda"
 
@@ -92,7 +92,7 @@ label RESTART
 
   print             "${dU} ${lf}" file data2/backward_${N_sim}.dat
   variable          lambda equal ramp(${lf},${li})
-  fix               f3 all adapt 1 pair sw fscale * * v_lambda
+  fix               f3 all adapt 1 pair sw fscale 1 1 v_lambda
   fix               f4 all print 1 "${dU} ${lambda}" screen no &
                     append data2/backward_${N_sim}.dat title "# dU lambda"
 
