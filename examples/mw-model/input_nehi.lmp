@@ -74,7 +74,7 @@ label RESTART
 ##########################################     Run simulation     ######################################
 # Turn UF potential off (completely) to equilibrate the SW potential.
   variable          zero equal 0
-  fix               f0 all adapt 0 pair ufm fscale * * v_zero
+  fix               f0 all adapt 0 pair ufm fscale 1 1 v_zero
   run               0
   unfix             f0
 
@@ -83,9 +83,9 @@ label RESTART
 
   print             "${dU} ${li}" file data/forward_${N_sim}.dat
   variable          lambda_sw equal ramp(${li},${lf})
-  fix               f3 all adapt 1 pair sw fscale * * v_lambda_sw
+  fix               f3 all adapt 1 pair sw fscale 1 1 v_lambda_sw
   variable          lambda_ufm equal ramp(${lf},${li})
-  fix               f4 all adapt 1 pair ufm fscale * * v_lambda_ufm
+  fix               f4 all adapt 1 pair ufm fscale 1 1 v_lambda_ufm
   fix               f5 all print 1 "${dU} ${lambda_sw}" &
                     title "# dU lambda" screen no       &
                     append data/forward_${N_sim}.dat
@@ -101,9 +101,9 @@ label RESTART
 
   print             "${dU} ${lf}" file data/backward_${N_sim}.dat
   variable          lambda_sw equal ramp(${lf},${li})
-  fix               f3 all adapt 1 pair sw fscale * * v_lambda_sw
+  fix               f3 all adapt 1 pair sw fscale 1 1 v_lambda_sw
   variable          lambda_ufm equal ramp(${li},${lf})
-  fix               f4 all adapt 1 pair ufm fscale * * v_lambda_ufm
+  fix               f4 all adapt 1 pair ufm fscale 1 1 v_lambda_ufm
   fix               f5 all print 1 "${dU} ${lambda_sw}" &
                     title "# dU lambda" screen no       &
                     append data/backward_${N_sim}.dat
