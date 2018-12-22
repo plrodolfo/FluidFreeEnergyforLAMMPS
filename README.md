@@ -5,8 +5,9 @@ What is this?
 This repository contains a set of source codes and input scripts that allows to perform nonequilibrium free-energy calculations of fluid-phase systems using [LAMMPS](http://lammps.sandia.gov/) code. Details about the code implementation, capabilities and obtained results with these methods will be found in:
 
 ["Nonequilibrium Free-Energy Calculations of Fluids using LAMMPS"  
-Rodolfo Paula Leite, and Maurice de Koning  
-Computational Material Science (submitted)](https://)
+Rodolfo Paula Leite, Maurice de Koning  
+Computational Material Science 159, 316-326 (2019)
+https://doi.org/10.1016/j.commatsci.2018.12.029](https://www.sciencedirect.com/science/article/pii/S0927025618308085)
 
 What are the repository contents?
 --------------
