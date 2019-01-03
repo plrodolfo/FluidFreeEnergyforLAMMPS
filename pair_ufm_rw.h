@@ -54,6 +54,7 @@ class PairUFMRW : public Pair {
   int typeH,typeO;             // atom types of UF/Rw water H and O atoms
   double epsilon,sigma;        // energy and distance scales for UF/Rw
   double uf1,uf2,uf3,uf4;      // UFM parameters
+  double **scale;
   double **fscale;             // scale parameter used to perform TI
 
   int nmax;                    // info on molecule's center-of-mass
