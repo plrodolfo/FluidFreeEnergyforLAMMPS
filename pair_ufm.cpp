@@ -40,30 +40,17 @@ using namespace LAMMPS_NS;
 using namespace MathConst;
 
 static const char cite_pair_ufm[] =
-"UFM pair style:\n\n"
-"@article{PaulaLeite2018,\n"
-"  author={Paula Leite, Rodolfo and Freitas, Rodrigo and Azevedo, Rodolfo and de Koning, Maurice},\n"
-"  title={The Uhlenbeck-Ford model: Exact virial coefficients and application as a reference system in fluid-phase free-energy calculations},\n"
-"  journal={The Journal of Chemical Physics},\n"
-"  volume={145},\n"
-"  pages={194101},\n"
-"  year={2016},\n"
-"  publisher={AIP}\n"
-"}\n\n";
-
-/*
-static const char cite_fpfec[] =
 "Fluid-phase free-energy calculations:\n\n"
-"@article{PaulaLeite2018,\n"
+"@article{PaulaLeite2019,\n"
 "  author={Paula Leite, Rodolfo and de Koning, Maurice},\n"
 "  title={Nonequilibrium free-energy calculations of fluids using LAMMPS},\n"
 "  journal={Computational Materials Science},\n"
-"  volume={XXX},\n"
-"  pages={XX--XX},\n"
-"  year={2018},\n"
+"  volume={159},\n"
+"  pages={316--326},\n"
+"  year={2019},\n"
 "  publisher={Elsevier}\n"
 "}\n\n";
- */
+ 
 
 /* ---------------------------------------------------------------------- */
 
@@ -71,7 +58,6 @@ PairUFM::PairUFM(LAMMPS *lmp) : Pair(lmp)
 {
 
   if (lmp->citeme) lmp->citeme->add(cite_pair_ufm);
-//  if (lmp->citeme) lmp->citeme->add(cite_fpfec);
 
   writedata = 1;
 }
@@ -87,6 +73,7 @@ PairUFM::~PairUFM()
     memory->destroy(epsilon);
     memory->destroy(sigma);
     memory->destroy(fscale);
+    memory->destroy(scale);
     memory->destroy(uf1);
     memory->destroy(uf2);
     memory->destroy(uf3);
@@ -144,7 +131,7 @@ void PairUFM::compute(int eflag, int vflag)
 
       if (rsq < cutsq[itype][jtype]) {
         expuf = exp(- rsq * uf2[itype][jtype]);
-        fpair = factor * fscale[itype][jtype] * uf1[itype][jtype] * expuf /(1.0 - expuf);
+        fpair = factor * uf1[itype][jtype] * expuf /(1.0 - expuf) * fscale[itype][jtype] * scale[itype][jtype];
 
         f[i][0] += delx*fpair;
         f[i][1] += dely*fpair;
@@ -157,7 +144,7 @@ void PairUFM::compute(int eflag, int vflag)
 
         if (eflag) {
           evdwl = -uf3[itype][jtype] * log(1.0 - expuf) - offset[itype][jtype];
-            evdwl *= factor;
+            evdwl *= factor * scale[itype][jtype];
         }
 
         if (evflag) ev_tally(i,j,nlocal,newton_pair,
@@ -189,6 +176,7 @@ void PairUFM::allocate()
   memory->create(epsilon,n+1,n+1,"pair:epsilon");
   memory->create(sigma,n+1,n+1,"pair:sigma");
   memory->create(fscale,n+1,n+1,"pair:fscale");
+  memory->create(fscale,n+1,n+1,"pair:scale");
   memory->create(uf1,n+1,n+1,"pair:uf1");
   memory->create(uf2,n+1,n+1,"pair:uf2");
   memory->create(uf3,n+1,n+1,"pair:uf3");
@@ -245,6 +233,7 @@ void PairUFM::coeff(int narg, char **arg)
       epsilon[i][j] = epsilon_one;
       sigma[i][j] = sigma_one;
       fscale[i][j] = 1.0;
+      scale[i][j] = 1.0;
       cut[i][j] = cut_one;
       setflag[i][j] = 1;
       count++;
@@ -282,6 +271,7 @@ double PairUFM::init_one(int i, int j)
   uf3[j][i] = uf3[i][j];
   uf4[j][i] = uf4[i][j];
   fscale[j][i] = fscale[i][j];
+  scale[j][i] = scale[i][j];
   offset[j][i] = offset[i][j];
 
   return cut[i][j];
@@ -405,5 +395,6 @@ void *PairUFM::extract(const char *str, int &dim)
   if (strcmp(str,"epsilon") == 0) return (void *) epsilon;
   if (strcmp(str,"sigma") == 0) return (void *) sigma;
   if (strcmp(str,"fscale") == 0) return (void *) fscale;
+  if (strcmp(str,"scale") == 0) return (void *) scale;
   return NULL;
 }
