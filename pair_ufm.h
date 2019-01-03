@@ -49,7 +49,7 @@ class PairUFM : public Pair {
 
  protected:
   double cut_global;
-  double **cut,**fscale;
+  double **cut,**fscale,**scale;
   double **epsilon,**sigma;
   double **uf1,**uf2,**uf3,**uf4,**offset;
 
