@@ -43,26 +43,25 @@ Contributing author:
 using namespace LAMMPS_NS;
 using namespace MathConst;
 
-/*
 static const char cite_pair_ufm_rw[] =
 "UF/Rw pair style:\n\n"
-"@article{PaulaLeite2018,\n"
+"@article{PaulaLeite2019,\n"
 "  author={Paula Leite, Rodolfo and de Koning, Maurice},\n"
 "  title={Nonequilibrium free-energy calculations of fluids using LAMMPS},\n"
 "  journal={Computational Materials Science},\n"
-"  volume={XXX},\n"
-"  pages={XX--XX},\n"
-"  year={2018},\n"
+"  volume={159},\n"
+"  pages={316--326},\n"
+"  year={2019},\n"
 "  publisher={Elsevier}\n"
 "}\n\n";
- */
+
 
 /* ---------------------------------------------------------------------- */
 
 PairUFMRW::PairUFMRW(LAMMPS *lmp) : Pair(lmp)
 {
 
-//  if (lmp->citeme) lmp->citeme->add(cite_pair_ufm_rw);
+  if (lmp->citeme) lmp->citeme->add(cite_pair_ufm_rw);
 
   single_enable = 0;
 
@@ -81,6 +80,7 @@ PairUFMRW::~PairUFMRW()
     memory->destroy(hneigh);
     memory->destroy(com);
     memory->destroy(fscale);
+    memory->destroy(scale);
   }
 }
 
@@ -215,7 +215,7 @@ void PairUFMRW::compute(int eflag, int vflag)
         
              if (rsq < cut_comsq && itype == typeO && jtype == typeO) {
                  expuf = exp(- rsq * uf2);
-                 fcom = factor * fscale[itype][jtype] * uf1 * expuf /(1.0 - expuf);
+                 fcom = factor * uf1 * expuf /(1.0 - expuf) * fscale[itype][jtype] * scale[itype][jtype];
         
                  f[i][0] += delx*fcom*m[typeO]/M;
                  f[i][1] += dely*fcom*m[typeO]/M;
@@ -245,7 +245,7 @@ void PairUFMRW::compute(int eflag, int vflag)
 
                  if (eflag) {
                      evdwl = -uf3 * log(1.0 - expuf);
-                     evdwl *= factor;
+                     evdwl *= factor * scale[itype][jtype];
                  }
 
                  if (evflag) ev_tally(i,j,nlocal,newton_pair,
@@ -270,6 +270,7 @@ void PairUFMRW::allocate()
   memory->create(cutsq,n+1,n+1,"pair:cutsq");
   memory->create(setflag,n+1,n+1,"pair:setflag");
   memory->create(fscale,n+1,n+1,"pair:fscale");
+  memory->create(fscale,n+1,n+1,"pair:scale");
     
   for (int i = 1; i <= n; i++)
     for (int j = i; j <= n; j++)
@@ -314,6 +315,7 @@ void PairUFMRW::coeff(int narg, char **arg)
     for (int j = MAX(jlo,i); j <= jhi; j++) {
       setflag[i][j] = 1;
       fscale[i][j] = 1.0;
+      scale[i][j] = 1.0;
       count++;
     }
   }
@@ -353,6 +355,7 @@ void PairUFMRW::init_style()
 double PairUFMRW::init_one(int i, int j)
 {
   fscale[j][i] = fscale[i][j];
+  scale[j][i] = scale[i][j];
   return cut_com;
 }
 
@@ -467,5 +470,6 @@ void *PairUFMRW::extract(const char *str, int &dim)
   if (strcmp(str,"sigma") == 0) return (void *) &sigma;
   dim = 2;
   if (strcmp(str,"fscale") == 0) return (void *) fscale;
+  if (strcmp(str,"scale") == 0) return (void *) scale;
   return NULL;
 }
