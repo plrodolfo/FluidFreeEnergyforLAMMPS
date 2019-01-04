@@ -131,7 +131,7 @@ void PairUFM::compute(int eflag, int vflag)
 
       if (rsq < cutsq[itype][jtype]) {
         expuf = exp(- rsq * uf2[itype][jtype]);
-        fpair = factor * uf1[itype][jtype] * expuf /(1.0 - expuf) * fscale[itype][jtype] * scale[itype][jtype];
+        fpair = factor * fscale[itype][jtype] * scale[itype][jtype] * uf1[itype][jtype] * expuf/(1.0 - expuf);
 
         f[i][0] += delx*fpair;
         f[i][1] += dely*fpair;
