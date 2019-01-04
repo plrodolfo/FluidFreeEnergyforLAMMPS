@@ -51,19 +51,21 @@ WARNING: The next step will overwrite some native source codes in your src folde
 
 3) Choose some machine file (e.g. Makefile.mpi) and build LAMMPS using the following commands:
 
-i) make yes-kspace
+i) make yes-manybody
 
-ii) make yes-molecule
+ii) make yes-kspace
 
-iii) make yes-rigid
+iii) make yes-molecule
 
-iv) make yes-user-meamc
+iv) make yes-rigid
 
-v) make yes-user-ffe
+v) make yes-user-meamc
 
-vi) make mpi
+vi) make yes-user-ffe
 
-NOTE: Steps (i-v) are necessary to install the required packages to reproduce the results presented in our [paper](https://).
+vii) make mpi
+
+NOTE: Steps (i-vi) are necessary to install the required packages to reproduce the results presented in our [paper](https://www.sciencedirect.com/science/article/pii/S0927025618308085).
 
 4) If LAMMPS was successully built, an executable called "lmp_mpi" will be created in the src directory. Otherwise, an error message is reported. For futher details, please visit the ["Build LAMMPS"](https://lammps.sandia.gov/doc/Build.html) section on user documentation.
 
