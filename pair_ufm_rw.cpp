@@ -215,7 +215,7 @@ void PairUFMRW::compute(int eflag, int vflag)
         
              if (rsq < cut_comsq && itype == typeO && jtype == typeO) {
                  expuf = exp(- rsq * uf2);
-                 fcom = factor * uf1 * expuf /(1.0 - expuf) * fscale[itype][jtype] * scale[itype][jtype];
+                 fcom = factor * fscale[itype][jtype] * scale[itype][jtype] * uf1 * expuf/(1.0 - expuf);
         
                  f[i][0] += delx*fcom*m[typeO]/M;
                  f[i][1] += dely*fcom*m[typeO]/M;
@@ -270,7 +270,7 @@ void PairUFMRW::allocate()
   memory->create(cutsq,n+1,n+1,"pair:cutsq");
   memory->create(setflag,n+1,n+1,"pair:setflag");
   memory->create(fscale,n+1,n+1,"pair:fscale");
-  memory->create(fscale,n+1,n+1,"pair:scale");
+  memory->create(scale,n+1,n+1,"pair:scale");
     
   for (int i = 1; i <= n; i++)
     for (int j = i; j <= n; j++)
