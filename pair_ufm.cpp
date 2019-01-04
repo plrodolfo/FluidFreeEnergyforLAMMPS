@@ -176,7 +176,7 @@ void PairUFM::allocate()
   memory->create(epsilon,n+1,n+1,"pair:epsilon");
   memory->create(sigma,n+1,n+1,"pair:sigma");
   memory->create(fscale,n+1,n+1,"pair:fscale");
-  memory->create(fscale,n+1,n+1,"pair:scale");
+  memory->create(scale,n+1,n+1,"pair:scale");
   memory->create(uf1,n+1,n+1,"pair:uf1");
   memory->create(uf2,n+1,n+1,"pair:uf2");
   memory->create(uf3,n+1,n+1,"pair:uf3");
