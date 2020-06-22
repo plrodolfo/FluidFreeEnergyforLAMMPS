@@ -23,16 +23,13 @@ What is new in these source codes?
 --------------
 | Code Name                       | Already exists? |  Modification |
 | :---                            |     :---:      |     :---      |
-|angle.cpp / .h                   | yes            | Added extract method and reinit function.
-|
-|angle_harmonic.cpp / .h          | yes            | Added a fscale variable (which multiplies only the forces) and the extract() method to adapt parameter over the time.
-|
-|bond_harmonic.cpp / .h           | yes            | Added a fscale variable (which multiplies only the forces) and the extract() method to adapt parameter over the time.
-|
+|angle.cpp / .h                   | yes            | Added extract method and reinit function.|
+|angle_harmonic.cpp / .h          | yes            | Added a fscale variable (which multiplies only the forces) and the extract() method to adapt parameter over the time.|
+|bond_harmonic.cpp / .h           | yes            | Added a fscale variable (which multiplies only the forces) and the extract() method to adapt parameter over the time.|
 |fix_adapt.cpp / .h               | yes            | Added a fscale keyword for kspace pppm and pppm/tip4p styles to adapt only the forces during MD simulations. Also added the possibility to adapt angle potential (such as angle_harmonic that is used in the examples).|
-|kspace.cpp / .h                  | yes            | Added a fscale variable in extract() method.                           |
-|meam_force.cpp                   | yes            | Added a fscale variable into meam_force function.                         |
-|meam.h                           | yes            | Added a fscale variable into meam_force function.                           |
+|kspace.cpp / .h                  | yes            | Added a fscale variable in extract() method.                          |
+|meam_force.cpp                   | yes            | Added a fscale variable into meam_force function.                     |
+|meam.h                           | yes            | Added a fscale variable into meam_force function.                     |
 |pair_lj_cut_coul_long.cpp / .h   | yes            | Added a fscale variable (which multiplies only the forces) in the extract() method.                           |
 |pair_lj_cut_tip4p_long.cpp / .h  | yes            | Added a fscale variable (which multiplies only the forces) in the extract() method.                         |
 |pair_meam.cpp / .h               | yes            | Added a fscale variable (which multiplies only the forces) and the extract() method to adapt parameter over the time.                         |
