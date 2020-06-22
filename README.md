@@ -23,7 +23,13 @@ What is new in these source codes?
 --------------
 | Code Name                       | Already exists? |  Modification |
 | :---                            |     :---:      |     :---      |
-|fix_adapt.cpp / .h               | yes            | Added a fscale keyword for kspace pppm and pppm/tip4p styles to adapt only the forces during MD simulations. |
+|angle.cpp / .h                   | yes            | Added extract method and reinit function.
+|
+|angle_harmonic.cpp / .h          | yes            | Added a fscale variable (which multiplies only the forces) and the extract() method to adapt parameter over the time.
+|
+|bond_harmonic.cpp / .h           | yes            | Added a fscale variable (which multiplies only the forces) and the extract() method to adapt parameter over the time.
+|
+|fix_adapt.cpp / .h               | yes            | Added a fscale keyword for kspace pppm and pppm/tip4p styles to adapt only the forces during MD simulations. Also added the possibility to adapt angle potential (such as angle_harmonic that is used in the examples).|
 |kspace.cpp / .h                  | yes            | Added a fscale variable in extract() method.                           |
 |meam_force.cpp                   | yes            | Added a fscale variable into meam_force function.                         |
 |meam.h                           | yes            | Added a fscale variable into meam_force function.                           |
@@ -71,7 +77,7 @@ NOTE: Steps (i-vi) are necessary to install the required packages to reproduce t
 
 How to use these codes?
 --------------
-Instructions of how to use these codes can be found inside each LAMMPS input script in the [`examples`](examples) directory and in our [paper](https://).
+Instructions of how to use these codes can be found inside each LAMMPS input script in the [`examples`](examples) directory and in our [paper](https://www.sciencedirect.com/science/article/pii/S0927025618308085).
 
 Current compatibility:
 --------------
