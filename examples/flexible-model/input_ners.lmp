@@ -90,6 +90,8 @@ label RESTART
   print           "${dU} ${li}" file data2/forward_${N_sim}.dat
   variable        lambda equal ramp(${li},${lf})
   fix             f3 all adapt 1 pair lj/cut/coul/long fscale * * v_lambda &
+                  bond harmonic fscale * v_lambda &
+                  angle harmonic fscale * v_lambda &
                   kspace v_lambda fscale yes
   fix             f4 all print 1 "${dU} ${lambda}" &
                   title "# dU lambda" screen no       &
@@ -109,6 +111,8 @@ label RESTART
   print           "${dU} ${lf}" file data2/backward_${N_sim}.dat
   variable        lambda equal ramp(${lf},${li})
   fix             f3 all adapt 1 pair lj/cut/coul/long fscale * * v_lambda &
+                  bond harmonic fscale * v_lambda &
+                  angle harmonic fscale * v_lambda &
                   kspace v_lambda fscale yes
   fix             f4 all print 1 "${dU} ${lambda}" &
                   title "# dU lambda" screen no       &
